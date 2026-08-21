@@ -14,7 +14,7 @@ local BONE_POSITIONS = {
     CFrame.new(-9570.88281, 5.81831884, 6187.86279),
 }
 
-local SPEED = 300
+local SPEED = 250
 local currentIndex = 1
 local currentTarget = nil
 local isFlying = false
