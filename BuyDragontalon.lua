@@ -7,7 +7,7 @@ local NPC_POSITION = CFrame.new(5661.89014, 1211.31909, 864.836731, 0.811413169,
 local SPEED = 250
 
 local function flyTo(targetCFrame, speed)
-    speed = speed or 300
+    speed = speed or SPEED
     local char = player.Character
     if not char then return end
     local root = char:FindFirstChild("HumanoidRootPart")
@@ -21,23 +21,22 @@ local function flyTo(targetCFrame, speed)
     
     root.CanCollide = false
     hum.PlatformStand = true
-    _G.IsFlying = true
     
     local distance = (targetCFrame.Position - root.Position).Magnitude
     local duration = math.max(distance / speed, 0.5)
     
-    _G.CurrentFlyTween = TweenService:Create(root, TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), {CFrame = targetCFrame})
-    
-    _G.CurrentFlyTween.Completed:Connect(function(state)
-        if state == Enum.PlaybackState.Completed then
-            root.CanCollide = true
-            hum.PlatformStand = false
-            _G.IsFlying = false
-            _G.CurrentFlyTween = nil
-        end
-    end)
+    _G.CurrentFlyTween = TweenService:Create(
+        root, 
+        TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), 
+        {CFrame = targetCFrame}
+    )
     
     _G.CurrentFlyTween:Play()
+    _G.CurrentFlyTween.Completed:Wait()
+    
+    root.CanCollide = true
+    hum.PlatformStand = false
+    _G.CurrentFlyTween = nil
 end
 
 local function waitForTeleport(timeout)
@@ -46,6 +45,7 @@ local function waitForTeleport(timeout)
     if not startPos then return false end
     local startPosCopy = startPos.Position
     local elapsed = 0
+    
     while elapsed < timeout do
         task.wait(0.1)
         elapsed = elapsed + 0.1
@@ -60,7 +60,6 @@ local function waitForTeleport(timeout)
 end
 
 local function buyDragonTalon()
-    task.wait(5)
     pcall(function()
         replicated.Remotes.CommF_:InvokeServer("BuyDragonTalon")
         task.wait(0.3)
@@ -89,43 +88,22 @@ local function smartFlyToNPC()
         return
     end
     
-    if distToDoor <= 100 then
-        flyTo(DOOR_POSITION, 150)
-        task.wait(0.5)
-        local teleported = waitForTeleport(2)
-        if teleported then
-            task.wait(0.5)
-            flyTo(NPC_POSITION, SPEED)
-            task.wait(1)
-            buyDragonTalon()
-        else
-            flyTo(NPC_POSITION, SPEED)
-            task.wait(1)
-            buyDragonTalon()
-        end
-        return
-    end
-    
-    flyTo(DOOR_POSITION, SPEED)
-    task.wait(0.5)
-    local currentRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    if currentRoot and (currentRoot.Position - DOOR_POSITION.Position).Magnitude <= 30 then
-        flyTo(DOOR_POSITION, 100)
-        task.wait(0.5)
-        local teleported = waitForTeleport(2)
-        if teleported then
-            task.wait(0.5)
-            flyTo(NPC_POSITION, SPEED)
-            task.wait(1)
-            buyDragonTalon()
-        else
-            flyTo(NPC_POSITION, SPEED)
-            task.wait(1)
-            buyDragonTalon()
-        end
-    else
+    if distToNPC < distToDoor then
         flyTo(NPC_POSITION, SPEED)
-        task.wait(1)
+        task.wait(0.5)
+        buyDragonTalon()
+    else
+        flyTo(DOOR_POSITION, SPEED)
+        task.wait(0.5)
+        
+        local teleported = waitForTeleport(2)
+        
+        if teleported then
+            task.wait(0.5)
+        end
+        
+        flyTo(NPC_POSITION, SPEED)
+        task.wait(0.5)
         buyDragonTalon()
     end
 end
@@ -138,14 +116,18 @@ game:GetService("UserInputService").InputBegan:Connect(function(input, gameProce
         if _G.CurrentFlyTween then
             _G.CurrentFlyTween:Cancel()
             _G.CurrentFlyTween = nil
-            local char = player.Character
-            if char then
-                local root = char:FindFirstChild("HumanoidRootPart")
-                local hum = char:FindFirstChildWhichIsA("Humanoid")
-                if root then root.CanCollide = true end
-                if hum then hum.PlatformStand = false end
+        end
+        
+        local char = player.Character
+        if char then
+            local root = char:FindFirstChild("HumanoidRootPart")
+            local hum = char:FindFirstChildWhichIsA("Humanoid")
+            if root then 
+                root.CanCollide = true
             end
-            _G.IsFlying = false
+            if hum then 
+                hum.PlatformStand = false 
+            end
         end
     end
 end)
