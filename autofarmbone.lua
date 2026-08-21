@@ -1,4 +1,7 @@
-
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dolcestudioluaU/kaitun/refs/heads/main/autoequipmelee.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dolcestudioluaU/kaitun/refs/heads/main/autobringmob"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dolcestudioluaU/kaitun/refs/heads/main/autoattack.lua"))()
+loadstring(game:HttpGet(""))()
 local TweenService = game:GetService("TweenService")
 local player = game.Players.LocalPlayer
 local runService = game:GetService("RunService")
