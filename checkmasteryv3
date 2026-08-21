@@ -1,0 +1,87 @@
+-- trên 500 = rejon server :>
+local RS = game:GetService("ReplicatedStorage")
+local ItemReplicationService = require(RS:WaitForChild("ItemReplicationService"))
+local KEYS = require(RS.ItemReplicationService.KEYS)
+local ItemConfig = require(RS:WaitForChild("ItemConfig"))
+
+local player = game.Players.LocalPlayer
+local teleportService = game:GetService("TeleportService")
+
+local function getItemName(itemId)
+    local ok, name = pcall(function()
+        return ItemConfig.match(itemId):unwrap().Index.DebugLabel
+    end)
+    if ok and name then
+        return name
+    end
+    return "Unknown_" .. tostring(itemId)
+end
+
+local function GetIdItem(targetName)
+    local quantityItems = ItemReplicationService:GetItems(KEYS.QUANTITY)
+    if not quantityItems then return nil end
+
+    for _, item in pairs(quantityItems) do
+        local rawName = getItemName(item.ItemId)
+        local cleanName = string.match(rawName, "^(.-)%s*%[") or rawName
+        
+        if cleanName == targetName or string.find(rawName, targetName, 1, true) then
+            return item.ItemId
+        end
+    end
+    return nil
+end
+
+local function getItemMastery(target)
+    local targetItemId = nil
+    if type(target) == "number" then
+        targetItemId = target
+    elseif type(target) == "string" then
+        targetItemId = GetIdItem(target)
+    end
+
+    if not targetItemId then return 0 end
+
+    local masteryItems = ItemReplicationService:GetItems(KEYS.MASTERY)
+    if masteryItems then
+        for _, item in pairs(masteryItems) do
+            if item.ItemId == targetItemId then
+                return item.Value or 0
+            end
+        end
+    end
+    return 0
+end
+
+local function getWeaponType(tool)
+    if not tool then return nil end
+    local tip = tool.ToolTip
+    if tip == "Melee" then return "Melee"
+    elseif tip == "Sword" then return "Sword"
+    elseif tip == "Gun" then return "Gun"
+    elseif tip == "Blox Fruit" then return "Blox Fruit"
+    end
+    return nil
+end
+
+local function checkMastery()
+    local char = player.Character
+    if not char then return end
+    
+    local tool = char:FindFirstChildOfClass("Tool")
+    if not tool then return end
+    
+    local weaponType = getWeaponType(tool)
+    if not weaponType then return end
+    
+    local mastery = getItemMastery(tool.Name)
+    
+    if mastery >= 500 then
+        teleportService:Teleport(game.PlaceId, player)
+    end
+end
+
+while true do
+    pcall(checkMastery)
+    task.wait(0.1)
+end
