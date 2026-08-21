@@ -1,0 +1,62 @@
+local player = game.Players.LocalPlayer
+local replicated = game:GetService("ReplicatedStorage")
+
+local isRunning = false
+
+local function enableHaki()
+    local char = player.Character
+    if not char then return end
+    
+    -- Bật Haki Vũ Trang
+    if not char:FindFirstChild("HasBuso") then
+        pcall(function()
+            replicated.Remotes.CommF_:InvokeServer("Buso")
+        end)
+    end
+    
+    -- Bật Haki Quan Sát
+    pcall(function()
+        replicated.Remotes.CommE:FireServer("Ken", true)
+    end)
+end
+
+local function start()
+    if isRunning then return end
+    isRunning = true
+    _G.AutoHaki = true
+    
+    task.spawn(function()
+        while isRunning and _G.AutoHaki do
+            pcall(enableHaki)
+            task.wait(0.1)
+        end
+    end)
+end
+
+local function stop()
+    isRunning = false
+    _G.AutoHaki = false
+end
+
+-- Phím F6 để bật/tắt
+game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.F6 then
+        if isRunning then
+            stop()
+        else
+            start()
+        end
+    end
+end)
+
+-- Tự động chạy khi script được load
+start()
+
+-- Bật lại Haki khi respawn
+player.CharacterAdded:Connect(function()
+    task.wait(0.5)
+    if isRunning then
+        pcall(enableHaki)
+    end
+end)
