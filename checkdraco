@@ -1,0 +1,30 @@
+local player = game.Players.LocalPlayer
+
+local function checkDragonTalon()
+    local backpack = player:FindFirstChild("Backpack")
+    if not backpack then
+        print("Error")
+        return
+    end
+    
+    for _, tool in pairs(backpack:GetChildren()) do
+        if tool:IsA("Tool") and tool.Name == "Dragon Talon" then
+            print("1")
+            return
+        end
+    end
+    
+    local char = player.Character
+    if char then
+        for _, tool in pairs(char:GetChildren()) do
+            if tool:IsA("Tool") and tool.Name == "Dragon Talon" then
+                print("1")
+                return
+            end
+        end
+    end
+    
+    print("2")
+end
+
+checkDragonTalon()
