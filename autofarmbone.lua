@@ -1,11 +1,10 @@
-loadstring(game:HttpGet("https://raw.githubusercontent.com/dolcestudioluaU/kaitun/refs/heads/main/autoequipmelee.lua"))()
 loadstring(game:HttpGet("https://raw.githubusercontent.com/dolcestudioluaU/kaitun/refs/heads/main/autobringmob"))()
 loadstring(game:HttpGet("https://raw.githubusercontent.com/dolcestudioluaU/kaitun/refs/heads/main/autoattack.lua"))()
 loadstring(game:HttpGet("https://raw.githubusercontent.com/dolcestudioluaU/kaitun/refs/heads/main/autohaki"))()
 
 local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 local player = game.Players.LocalPlayer
-local runService = game:GetService("RunService")
 
 local BONE_POSITIONS = {
     CFrame.new(-8769.58984, 142.13063, 6055.27637),
@@ -14,41 +13,66 @@ local BONE_POSITIONS = {
     CFrame.new(-9570.88281, 5.81831884, 6187.86279),
 }
 
-local SPEED = 250
+local SPEED = 280
+local LOCK_DISTANCE = 5
 local currentIndex = 1
 local currentTarget = nil
-local isFlying = false
-local lockEnabled = false
+local bodyVelocity = nil
+local bodyGyro = nil
 
-local function flyTo(targetCFrame, speed)
-    speed = speed or 300
+local function setupBodyMovers()
     local char = player.Character
     if not char then return end
     local root = char:FindFirstChild("HumanoidRootPart")
-    local hum = char:FindFirstChildWhichIsA("Humanoid")
-    if not root or not hum then return end
+    if not root then return end
     
-    if _G.CurrentFlyTween then
-        _G.CurrentFlyTween:Cancel()
-        _G.CurrentFlyTween = nil
+    if not bodyVelocity then
+        bodyVelocity = Instance.new("BodyVelocity")
+        bodyVelocity.Name = "FarmBV"
+        bodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+        bodyVelocity.Velocity = Vector3.zero
+        bodyVelocity.Parent = root
     end
     
-    root.CanCollide = false
-    hum.PlatformStand = true
-    isFlying = true
+    if not bodyGyro then
+        bodyGyro = Instance.new("BodyGyro")
+        bodyGyro.Name = "FarmBG"
+        bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+        bodyGyro.P = 9e4
+        bodyGyro.D = 500
+        bodyGyro.Parent = root
+    end
+end
+
+local function removeBodyMovers()
+    if bodyVelocity then
+        bodyVelocity:Destroy()
+        bodyVelocity = nil
+    end
+    if bodyGyro then
+        bodyGyro:Destroy()
+        bodyGyro = nil
+    end
+end
+
+local function smoothMoveTo(targetPos)
+    local char = player.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
     
-    local distance = (targetCFrame.Position - root.Position).Magnitude
-    local duration = math.max(distance / speed, 0.5)
+    setupBodyMovers()
     
-    _G.CurrentFlyTween = TweenService:Create(root, TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), {CFrame = targetCFrame})
+    local distance = (targetPos - root.Position).Magnitude
+    local direction = (targetPos - root.Position).Unit
     
-    _G.CurrentFlyTween.Completed:Connect(function(state)
-        if state == Enum.PlaybackState.Completed then
-            isFlying = false
-        end
-    end)
+    if distance > LOCK_DISTANCE then
+        bodyVelocity.Velocity = direction * SPEED
+    else
+        bodyVelocity.Velocity = Vector3.zero
+    end
     
-    _G.CurrentFlyTween:Play()
+    bodyGyro.CFrame = CFrame.lookAt(root.Position, targetPos)
 end
 
 local function getAliveBone()
@@ -60,6 +84,8 @@ local function getAliveBone()
         local hrp = currentTarget:FindFirstChild("HumanoidRootPart")
         if hum and hrp and hum.Health > 0 then
             return currentTarget
+        else
+            currentTarget = nil
         end
     end
     
@@ -69,18 +95,22 @@ local function getAliveBone()
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return nil end
     
+    local validNames = {
+        ["Reborn Skeleton"] = true,
+        ["Living Zombie"] = true,
+        ["Demonic Soul"] = true,
+        ["Posessed Mummy"] = true
+    }
+    
     for _, enemy in pairs(enemies:GetChildren()) do
-        if enemy:FindFirstChild("Humanoid") and enemy:FindFirstChild("HumanoidRootPart") then
-            local hum = enemy.Humanoid
-            local hrp = enemy.HumanoidRootPart
-            if hum.Health > 0 then
-                local name = enemy.Name
-                if name == "Reborn Skeleton" or name == "Living Zombie" or name == "Demonic Soul" or name == "Posessed Mummy" then
-                    local dist = (hrp.Position - root.Position).Magnitude
-                    if dist < bestDist then
-                        bestDist = dist
-                        bestEnemy = enemy
-                    end
+        if validNames[enemy.Name] then
+            local hum = enemy:FindFirstChild("Humanoid")
+            local hrp = enemy:FindFirstChild("HumanoidRootPart")
+            if hum and hrp and hum.Health > 0 then
+                local dist = (hrp.Position - root.Position).Magnitude
+                if dist < bestDist then
+                    bestDist = dist
+                    bestEnemy = enemy
                 end
             end
         end
@@ -90,99 +120,97 @@ local function getAliveBone()
     return bestEnemy
 end
 
-local function farmBone()
-    while _G.AutoFarmBone do
+local heartbeatConnection = nil
+
+local function startFarm()
+    if heartbeatConnection then
+        heartbeatConnection:Disconnect()
+    end
+    
+    heartbeatConnection = RunService.Heartbeat:Connect(function()
+        if not _G.AutoFarmBone then
+            if heartbeatConnection then
+                heartbeatConnection:Disconnect()
+                heartbeatConnection = nil
+            end
+            removeBodyMovers()
+            return
+        end
+        
         pcall(function()
             local char = player.Character
-            if not char then task.wait(1) return end
+            if not char then return end
+            
             local root = char:FindFirstChild("HumanoidRootPart")
-            if not root then task.wait(1) return end
+            local hum = char:FindFirstChildWhichIsA("Humanoid")
+            if not root or not hum then return end
+            
+            root.CanCollide = false
+            hum.PlatformStand = true
             
             local enemy = getAliveBone()
             
             if enemy then
                 local hrp = enemy:FindFirstChild("HumanoidRootPart")
                 if hrp then
-                    local targetCF = CFrame.new(hrp.Position.X, hrp.Position.Y + 20, hrp.Position.Z)
-                    
-                    if not isFlying then
-                        flyTo(targetCF, SPEED)
-                    end
-                    
-                    lockEnabled = true
+                    local targetPos = Vector3.new(hrp.Position.X, hrp.Position.Y + 20, hrp.Position.Z)
+                    smoothMoveTo(targetPos)
                 end
             else
-                lockEnabled = false
-                isFlying = false
-                flyTo(BONE_POSITIONS[currentIndex], SPEED)
-                task.wait(1.5)
-                currentIndex = currentIndex % #BONE_POSITIONS + 1
-                currentTarget = nil
+                local targetPos = BONE_POSITIONS[currentIndex].Position
+                local distance = (targetPos - root.Position).Magnitude
+                
+                if distance < 10 then
+                    currentIndex = (currentIndex % #BONE_POSITIONS) + 1
+                end
+                
+                smoothMoveTo(targetPos)
             end
-            
-            task.wait(0.1)
         end)
-        task.wait(0.05)
+    end)
+end
+
+local function stopFarm()
+    _G.AutoFarmBone = false
+    currentTarget = nil
+    
+    if heartbeatConnection then
+        heartbeatConnection:Disconnect()
+        heartbeatConnection = nil
+    end
+    
+    removeBodyMovers()
+    
+    local char = player.Character
+    if char then
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChildWhichIsA("Humanoid")
+        
+        if root then
+            root.CanCollide = true
+            root.Velocity = Vector3.zero
+        end
+        
+        if hum then
+            hum.PlatformStand = false
+        end
     end
 end
 
--- Loop lock vị trí - FIX GIẬT
-task.spawn(function()
-    local lastPos = nil
-    while _G.AutoFarmBone do
-        pcall(function()
-            if lockEnabled and currentTarget and currentTarget.Parent then
-                local char = player.Character
-                if char then
-                    local root = char:FindFirstChild("HumanoidRootPart")
-                    local hrp = currentTarget:FindFirstChild("HumanoidRootPart")
-                    if root and hrp then
-                        local targetPos = CFrame.new(hrp.Position.X, hrp.Position.Y + 20, hrp.Position.Z)
-                        
-                        -- Chỉ cập nhật khi quái di chuyển > 2 studs để tránh giật
-                        if lastPos == nil or (lastPos.Position - targetPos.Position).Magnitude > 2 then
-                            root.CFrame = targetPos
-                            root.CanCollide = false
-                            lastPos = targetPos
-                        end
-                        
-                        local hum = char:FindFirstChildWhichIsA("Humanoid")
-                        if hum then
-                            hum.PlatformStand = true
-                        end
-                    end
-                end
-            else
-                lastPos = nil
-            end
-        end)
-        task.wait(0.1) -- Giảm tần suất để tránh giật
-    end
-end)
-
 _G.AutoFarmBone = true
-farmBone()
+startFarm()
 
 game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.KeyCode == Enum.KeyCode.F8 then
-        _G.AutoFarmBone = false
-        lockEnabled = false
-        currentTarget = nil
-        if _G.CurrentFlyTween then
-            _G.CurrentFlyTween:Cancel()
-            _G.CurrentFlyTween = nil
-        end
-        local char = player.Character
-        if char then
-            local root = char:FindFirstChild("HumanoidRootPart")
-            local hum = char:FindFirstChildWhichIsA("Humanoid")
-            if root then 
-                root.CanCollide = true
-            end
-            if hum then hum.PlatformStand = false end
-        end
-        isFlying = false
+        stopFarm()
     end
 end)
 
+player.CharacterAdded:Connect(function()
+    removeBodyMovers()
+    if _G.AutoFarmBone then
+        task.wait(1)
+        startFarm()
+    end
+end)
