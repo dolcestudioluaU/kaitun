@@ -1,11 +1,9 @@
--- trên 500 = rejon server :>
 local RS = game:GetService("ReplicatedStorage")
 local ItemReplicationService = require(RS:WaitForChild("ItemReplicationService"))
 local KEYS = require(RS.ItemReplicationService.KEYS)
 local ItemConfig = require(RS:WaitForChild("ItemConfig"))
 
 local player = game.Players.LocalPlayer
-local teleportService = game:GetService("TeleportService")
 
 local function getItemName(itemId)
     local ok, name = pcall(function()
@@ -77,7 +75,9 @@ local function checkMastery()
     local mastery = getItemMastery(tool.Name)
     
     if mastery >= 500 then
-        teleportService:Teleport(game.PlaceId, player)
+        _G.AutoFarmBone = false
+        task.wait(0.5)
+        print("1")
     end
 end
 
