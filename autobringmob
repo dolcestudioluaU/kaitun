@@ -1,0 +1,145 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+local localPlayer = Players.LocalPlayer
+local GOM_QUAI_RADIUS = 275          -- Maximum distance to pull mobs from
+_G.BringMobs = true                  -- Global toggle (true = on)
+
+-- Table of active mobs being brought: key = mob instance, value = data table
+local activeMobs = {}
+
+-- Helper: get the player's HumanoidRootPart (cached)
+local function getPlayerRoot()
+    local char = localPlayer.Character
+    if not char then return nil end
+    return char:FindFirstChild("HumanoidRootPart")
+end
+
+-- Function to start bringing a specific mob (adds it to active table)
+local function startBringMob(mob)
+    if activeMobs[mob] then return end   -- already active
+
+    local rootPart = mob:FindFirstChild("HumanoidRootPart")
+    local humanoid = mob:FindFirstChild("Humanoid")
+    if not rootPart or not humanoid then return end
+
+    -- Create BodyPosition and BodyGyro for this mob
+    local bodyPos = Instance.new("BodyPosition")
+    bodyPos.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bodyPos.P = 2000000000
+    bodyPos.D = 500000
+    bodyPos.Parent = rootPart
+
+    local bodyGyro = Instance.new("BodyGyro")
+    bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    bodyGyro.Parent = rootPart
+
+    -- Store data for this mob
+    activeMobs[mob] = {
+        rootPart = rootPart,
+        humanoid = humanoid,
+        bodyPos = bodyPos,
+        bodyGyro = bodyGyro
+    }
+
+    -- Disable collision while being pulled
+    rootPart.CanCollide = false
+end
+
+-- Function to stop bringing a mob (remove from active and clean up)
+local function stopBringMob(mob)
+    local data = activeMobs[mob]
+    if not data then return end
+
+    -- Restore collision (optional, but recommended)
+    if data.rootPart then
+        data.rootPart.CanCollide = true
+    end
+
+    -- Destroy the instances
+    if data.bodyPos then data.bodyPos:Destroy() end
+    if data.bodyGyro then data.bodyGyro:Destroy() end
+
+    activeMobs[mob] = nil
+end
+
+-- Main update function – called every frame via Heartbeat
+local function updateBring()
+    if not _G.BringMobs then
+        -- If toggled off, stop all active bringing
+        for mob in pairs(activeMobs) do
+            stopBringMob(mob)
+        end
+        return
+    end
+
+    local playerRoot = getPlayerRoot()
+    if not playerRoot then
+        -- If player root missing, clear all (they'll be re-added when available)
+        for mob in pairs(activeMobs) do
+            stopBringMob(mob)
+        end
+        return
+    end
+
+    local playerPos = playerRoot.Position
+
+    -- Scan for enemies only once per frame, if the folder exists
+    local enemiesFolder = Workspace:FindFirstChild("Enemies")
+    if not enemiesFolder then return end
+
+    local allMobs = enemiesFolder:GetChildren()
+
+    -- First, check which mobs are still valid (alive and in range)
+    local toRemove = {}
+    for mob, data in pairs(activeMobs) do
+        -- Validate mob still exists, humanoid alive, and within radius
+        if not data.rootPart or not data.rootPart.Parent or not data.humanoid or data.humanoid.Health <= 0 then
+            table.insert(toRemove, mob)
+        else
+            local dist = (data.rootPart.Position - playerPos).Magnitude
+            if dist > GOM_QUAI_RADIUS then
+                table.insert(toRemove, mob)
+            end
+        end
+    end
+
+    -- Remove invalid mobs
+    for _, mob in ipairs(toRemove) do
+        stopBringMob(mob)
+    end
+
+    -- Now add new mobs that are within range
+    for _, mob in ipairs(allMobs) do
+        if not activeMobs[mob] then
+            local humanoid = mob:FindFirstChild("Humanoid")
+            local rootPart = mob:FindFirstChild("HumanoidRootPart")
+            if humanoid and humanoid.Health > 0 and rootPart then
+                local dist = (rootPart.Position - playerPos).Magnitude
+                if dist <= GOM_QUAI_RADIUS then
+                    startBringMob(mob)
+                end
+            end
+        end
+    end
+
+    -- Update positions for all active mobs (move them towards player)
+    for mob, data in pairs(activeMobs) do
+        if data.rootPart and data.bodyPos and data.bodyGyro then
+            -- Set the target position to player's current position
+            data.bodyPos.Position = playerPos
+            data.bodyGyro.CFrame = CFrame.new(playerPos)
+
+            -- Optionally zero out velocity to prevent drifting
+            data.rootPart.AssemblyLinearVelocity = Vector3.zero
+            data.rootPart.AssemblyAngularVelocity = Vector3.zero
+        end
+    end
+end
+
+-- Connect the update function to RunService.Heartbeat (runs every frame)
+RunService.Heartbeat:Connect(updateBring)
+
+-- Also, if the player's character respawns, we might want to clear active mobs
+-- because their root parts will be invalid. The update loop will handle that.
