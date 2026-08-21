@@ -90,7 +90,7 @@ local function checkMastery()
     if mastery >= 500 then
         print("1")
     else
-        print("2")
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/dolcestudioluaU/kaitun/refs/heads/main/autofarmbone.lua"))()
     end
 end
 
