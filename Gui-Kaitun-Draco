@@ -1,0 +1,200 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local TweenService = game:GetService("TweenService")
+
+-- Tạo ScreenGui
+local vyroHub = Instance.new("ScreenGui")
+vyroHub.Name = "VYRO_HUB"
+vyroHub.Parent = LocalPlayer:WaitForChild("PlayerGui")
+vyroHub.ResetOnSpawn = false -- Giữ GUI khi respawn
+
+-- Tạo Background bao phủ toàn màn hình (màu trắng xám)
+local background = Instance.new("Frame")
+background.Size = UDim2.new(1, 0, 1, 0) -- Fullscreen
+background.Position = UDim2.new(0, 0, 0, 0)
+background.BackgroundColor3 = Color3.fromRGB(220, 220, 230) -- Trắng xám
+background.BackgroundTransparency = 0.95 -- Hơi trong suốt để nhìn thấy game phía sau
+background.BorderSizePixel = 0
+background.Parent = vyroHub
+
+-- Tạo hiệu ứng mờ đẹp (nền kính mờ)
+local blur = Instance.new("BlurEffect")
+blur.Size = 12
+blur.Parent = game:GetService("Lighting") -- Hoặc gắn vào camera
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0.3, 0) -- Chiều rộng full, cao 30% màn hình
+title.Position = UDim2.new(0, 0, 0.35, 0) -- Căn giữa theo chiều dọc
+title.BackgroundTransparency = 1 -- Trong suốt
+title.Text = "Kaitun Vyro Hub [Draco]"
+title.TextColor3 = Color3.fromRGB(150, 50, 255) -- Màu tím cơ bản
+title.TextScaled = true -- Tự động co giãn
+title.Font = Enum.Font.GothamBold
+title.TextStrokeTransparency = 0.3 -- Viền mờ
+title.TextStrokeColor3 = Color3.fromRGB(100, 0, 200)
+title.Parent = background
+
+-- Thêm hiệu ứng bóng đổ cho chữ
+local shadow = Instance.new("Frame")
+shadow.Size = UDim2.new(1, 0, 0.3, 0)
+shadow.Position = UDim2.new(0, 0, 0.35, 0)
+shadow.BackgroundTransparency = 1
+shadow.Parent = background
+
+-- ===== HIỆU ỨNG LẤP LÁNH CHUYỂN MÀU TÍM =====
+-- Tạo nhiều màu tím khác nhau để chuyển đổi
+local purpleColors = {
+    Color3.fromRGB(180, 50, 255), -- Tím sáng
+    Color3.fromRGB(220, 50, 255), -- Tím hồng
+    Color3.fromRGB(140, 30, 255), -- Tím đậm
+    Color3.fromRGB(200, 80, 255), -- Tím nhạt
+    Color3.fromRGB(160, 40, 255), -- Tím trung
+    Color3.fromRGB(240, 60, 255), -- Tím pha hồng
+}
+
+-- Hiệu ứng lấp lánh (chuyển màu liên tục)
+local currentColorIndex = 1
+local glowEffect = true
+
+-- Hàm chuyển màu mượt mà
+local function cycleColor()
+    if not vyroHub or not vyroHub.Parent then return end -- Dừng nếu GUI bị xoá
+    
+    local nextIndex = currentColorIndex % #purpleColors + 1
+    local currentColor = purpleColors[currentColorIndex]
+    local nextColor = purpleColors[nextIndex]
+    
+    -- Tween chuyển màu
+    TweenService:Create(
+        title,
+        TweenInfo.new(1.5, Enum.EasingStyle.Linear, Enum.EasingDirection.Out),
+        {TextColor3 = nextColor}
+    ):Play()
+    
+    currentColorIndex = nextIndex
+end
+
+-- Chạy vòng lặp chuyển màu
+local cycleConnection
+cycleConnection = game:GetService("RunService").Heartbeat:Connect(function()
+    -- Mỗi 2 giây đổi màu 1 lần
+    if not cycleConnection then return end
+    
+    -- Dùng tick() để đếm thời gian
+    if not cycleConnection._lastTime then
+        cycleConnection._lastTime = tick()
+    end
+    
+    if tick() - cycleConnection._lastTime >= 2 then
+        cycleColor()
+        cycleConnection._lastTime = tick()
+    end
+    
+    -- Kiểm tra nếu GUI bị xoá thì ngắt kết nối
+    if not vyroHub or not vyroHub.Parent then
+        cycleConnection:Disconnect()
+    end
+end)
+
+-- Chạy lần đầu
+task.wait(0.5)
+cycleColor()
+
+-- ===== HIỆU ỨNG LẤP LÁNH THÊM (GLOW / PULSE) =====
+-- Tạo hiệu ứng phát sáng bằng TextLabel phụ (lớp đè)
+local glowLabel = Instance.new("TextLabel")
+glowLabel.Size = UDim2.new(1, 0, 0.3, 0)
+glowLabel.Position = UDim2.new(0, 0, 0.35, 0)
+glowLabel.BackgroundTransparency = 1
+glowLabel.Text = "Vyro Hub - Auto Draco"
+glowLabel.TextColor3 = Color3.fromRGB(200, 100, 255)
+glowLabel.TextScaled = true
+glowLabel.Font = Enum.Font.GothamBold
+glowLabel.TextTransparency = 0.5
+glowLabel.TextStrokeTransparency = 0.5
+glowLabel.TextStrokeColor3 = Color3.fromRGB(150, 0, 255)
+glowLabel.Parent = background
+
+-- Hiệu ứng glow nhấp nháy (tăng giảm độ trong suốt)
+local glowConnection
+glowConnection = game:GetService("RunService").Heartbeat:Connect(function()
+    if not glowLabel or not glowLabel.Parent then
+        if glowConnection then glowConnection:Disconnect() end
+        return
+    end
+    
+    -- Tạo hiệu ứng thở (sin wave)
+    local time = tick()
+    local pulse = (math.sin(time * 2) + 1) / 2 -- 0 -> 1
+    local transparency = 0.3 + (pulse * 0.5) -- 0.3 -> 0.8
+    
+    glowLabel.TextTransparency = transparency
+    glowLabel.TextStrokeTransparency = transparency * 0.8
+end)
+
+-- ===== THÊM HIỆU ỨNG SAO BAY (TẠO ĐIỂM NHẤN) =====
+local function createSparkle()
+    if not background or not background.Parent then return end
+    
+    local sparkle = Instance.new("Frame")
+    sparkle.Size = UDim2.new(0, 4, 0, 4)
+    sparkle.Position = UDim2.new(math.random() * 0.9 + 0.05, 0, math.random() * 0.9 + 0.05, 0)
+    sparkle.BackgroundColor3 = Color3.fromRGB(200, 150, 255)
+    sparkle.BorderSizePixel = 0
+    sparkle.BackgroundTransparency = 0.5
+    sparkle.Parent = background
+    
+    -- Hiệu ứng tan dần
+    TweenService:Create(
+        sparkle,
+        TweenInfo.new(2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {BackgroundTransparency = 1, Size = UDim2.new(0, 20, 0, 20)}
+    ):Play()
+    
+    -- Xoá sau 2 giây
+    task.delay(2, function()
+        if sparkle then sparkle:Destroy() end
+    end)
+end
+
+-- Tạo sao mỗi 0.5 giây
+local sparkleConnection
+sparkleConnection = game:GetService("RunService").Heartbeat:Connect(function()
+    if not sparkleConnection._lastSparkle then
+        sparkleConnection._lastSparkle = tick()
+    end
+    
+    if tick() - sparkleConnection._lastSparkle >= 0.5 then
+        createSparkle()
+        sparkleConnection._lastSparkle = tick()
+    end
+    
+    if not vyroHub or not vyroHub.Parent then
+        sparkleConnection:Disconnect()
+    end
+end)
+
+-- ===== HIỆU ỨNG XUẤT HIỆN =====
+-- Lúc đầu ẩn chữ, sau đó hiện dần
+title.TextTransparency = 1
+glowLabel.TextTransparency = 1
+
+TweenService:Create(
+    title,
+    TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+    {TextTransparency = 0}
+):Play()
+
+TweenService:Create(
+    glowLabel,
+    TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+    {TextTransparency = 0.5}
+):Play()
+
+-- Background xuất hiện từ từ
+background.BackgroundTransparency = 1
+TweenService:Create(
+    background,
+    TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+    {BackgroundTransparency = 0.95}
+):Play()
